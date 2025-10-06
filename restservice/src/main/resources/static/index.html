@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Demo Productos + Respuestas con Cache</title>
+    <style>
+        table { border-collapse: collapse; width: 50%; margin-bottom: 20px; }
+        th, td { border: 1px solid #333; padding: 5px 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .cached { color: green; font-weight: bold; }
+        .bd { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+<h1>Productos</h1>
+<button id="loadProductos">Cargar productos</button>
+<button id="crearProducto">Crear producto aleatorio</button>
+<button id="clearProductosCache">Limpiar cache productos</button>
+<div id="productosArea"></div>
+<div id="estadoProductosCache"></div>
+
+<hr>
+
+<h1>Respuestas</h1>
+<form id="formRespuesta">
+    <input type="text" name="pregunta" placeholder="Pregunta" required>
+    <input type="text" name="respuesta" placeholder="Respuesta" required>
+    <button type="submit">Guardar / Consultar</button>
+</form>
+<button id="clearRespuestasCache">Limpiar cache respuestas</button>
+<div id="mostrarRespuesta"></div>
+<div id="estadoRespuestasCache"></div>
+
+<script>
+    const productosArea = document.getElementById('productosArea');
+    const estadoProductosCache = document.getElementById('estadoProductosCache');
+    const mostrarRespuesta = document.getElementById('mostrarRespuesta');
+    const estadoRespuestasCache = document.getElementById('estadoRespuestasCache');
+
+    // ====== Productos ======
+    function renderProductos(list) {
+        if (!list || list.productos.length === 0) {
+            productosArea.innerHTML = '<p>No hay productos.</p>';
+            estadoProductosCache.textContent = '';
+            return;
+        }
+        let html = '<table><tr><th>ID</th><th>Nombre</th><th>Precio</th></tr>';
+        for (const p of list.productos) {
+            html += `<tr><td>${p.id}</td><td>${p.nombre}</td><td>${p.precio}</td></tr>`;
+        }
+        html += '</table>';
+        productosArea.innerHTML = html;
+        estadoProductosCache.innerHTML = list.cached
+            ? '<span class="cached">Viene de cache ✅</span>'
+            : '<span class="bd">Viene de BD ❌</span>';
+    }
+
+    document.getElementById('loadProductos').addEventListener('click', async ()=>{
+        const res = await fetch('/productos');
+        const data = await res.json();
+        renderProductos(data);
+    });
+
+    document.getElementById('crearProducto').addEventListener('click', async ()=>{
+        const nombres = ['Queso','Galleta','Café','Arroz','Azúcar','Manzana','Pan','Leche'];
+        const nombre = nombres[Math.floor(Math.random()*nombres.length)];
+        const precio = (Math.random()*5).toFixed(2);
+        await fetch('/productos',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({nombre,precio})
+        });
+        alert('Producto creado: '+nombre);
+    });
+
+    document.getElementById('clearProductosCache').addEventListener('click', async ()=>{
+        await fetch('/productos/clear-cache',{method:'POST'});
+        alert('Cache de productos limpiada');
+    });
+
+    // ====== Respuestas ======
+    document.getElementById('formRespuesta').addEventListener('submit', async e=>{
+        e.preventDefault();
+        const pregunta = e.target.pregunta.value;
+        const respuesta = e.target.respuesta.value;
+
+        // Guardar respuesta
+        await fetch(`/respuestas?pregunta=${encodeURIComponent(pregunta)}&respuesta=${encodeURIComponent(respuesta)}`,
+            {method:'POST'}
+        );
+
+        // Consultar respuesta
+        const res = await fetch(`/respuestas?pregunta=${encodeURIComponent(pregunta)}`);
+        const data = await res.json();
+        mostrarRespuesta.textContent = `Respuesta: ${data.respuesta}`;
+        estadoRespuestasCache.innerHTML = data.cached
+            ? '<span class="cached">Viene de cache ✅</span>'
+            : '<span class="bd">Viene de BD ❌</span>';
+    });
+
+    document.getElementById('clearRespuestasCache').addEventListener('click', async ()=>{
+        await fetch('/respuestas/clear-cache',{method:'POST'});
+        alert('Cache de respuestas limpiada');
+    });
+</script>
+</body>
+</html>
